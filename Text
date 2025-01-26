@@ -1,0 +1,95 @@
+Для работы с 24-разрядным Аналого-Цифровым Преобразователем (АЦП) на Raspberry Pi Pico с использованием библиотеки на C++, необходимо использовать библиотеку Pico SDK.
+В этом примере я предполагаю, что вы хотите взаимодействовать с АЦП через интерфейс SPI. Я предоставлю вам пример кода с шагами для настройки окружения Raspberry Pi Pico с использованием CMake.
+Шаги по настройке
+Настройка инструментов разработки: Убедитесь, что у вас установлены необходимые инструменты для разработки под Raspberry Pi Pico, включая CMake, gcc, make и библиотеку Pico SDK.
+Создайте проект: Создайте структуру вашего проекта. Например, создайте папку pico_adc и внутри неё создайте файл CMakeLists.txt и файл main.cpp.
+Структура проекта:
+pico_adc/
+├── CMakeLists.txt
+└── main.cpp
+CMakeLists.txt
+cmake_minimum_required(VERSION 3.13)
+
+# Указываем имя проекта и версию
+project(pico_adc)
+
+# Указываем стандарт C++
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Подключаем Pico SDK
+include(pico_sdk_import.cmake)
+
+# Создаем исполняемый файл
+add_executable(pico_adc main.cpp)
+
+# Подключаем Pico SDK
+target_link_libraries(pico_adc pico_stdlib hardware_spi)
+
+# Устанавливаем вывод при компиляции
+pico_add_extra_outputs(pico_adc)
+main.cpp
+#include "pico/stdlib.h"
+#include "hardware/spi.h"
+
+// Настройки SPI
+#define CS_PIN 17 // Пин Chip Select для Raspberry Pi Pico
+#define SPI_PORT spi0 // Используем SPI0
+
+void setup() {
+    // Инициализация ядра
+    stdio_init_all();
+
+    // Настройка пина CS
+    gpio_init(CS_PIN);
+    gpio_set_dir(CS_PIN, GPIO_OUT);
+    gpio_put(CS_PIN, 1); // Устанавливаем CS в высокое состояние (неактивен)
+
+    // Настройка SPI
+    spi_init(SPI_PORT, 4000000); // 4 MHz
+    spi_set_format(SPI_PORT, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+}
+
+uint32_t readADC() {
+    uint8_t cmd = 0; // Команда считывания (может варьироваться)
+    uint8_t msb, mid, lsb;
+
+    gpio_put(CS_PIN, 0); // Активируем АЦП
+    
+    // Отправляем команду
+    spi_write_blocking(SPI_PORT, &cmd, 1);
+    
+    // Чтение 3 байт
+    spi_read_blocking(SPI_PORT, 0x00, &msb, 1);
+    spi_read_blocking(SPI_PORT, 0x00, &mid, 1);
+    spi_read_blocking(SPI_PORT, 0x00, &lsb, 1);
+    
+    gpio_put(CS_PIN, 1); // Деактивируем АЦП
+
+    // Сборка 24-битного значения
+    return (msb << 16) | (mid << 8) | lsb;
+}
+
+int main() {
+    setup();
+
+    while (true) {
+        uint32_t adcValue = readADC();
+        printf("ADC Value: %u\n", adcValue);
+        sleep_ms(1000); // Задержка в 1 секунду
+    }
+
+    return 0;
+}
+Компиляция и загрузка
+Компиляция: После настройки структуры проекта и файлов, используйте следующие команды для сборки проекта:
+mkdir build
+cd build
+cmake ..
+make
+Перенос на Pico: После успешной компиляции, в папке build будет создан бинарный файл с вашим проектом. Перенесите его на Raspberry Pi Pico, используя USB.
+Запуск: После загрузки файла на Pico, перезагрузите устройство, и вы должны увидеть считываемые значения АЦП, выводимые в последовательный порт.
+Примечания
+Убедитесь, что параметры SPI и команда чтения корректны для вашего конкретного 24-разрядного АЦП. Их необходимо уточнить по документации АЦП.
+Если у вас есть специфические требования к вашему проекту, вы можете модифицировать код соответствующим образом.
+Корректно подключите необходимые линии, такие как MOSI, MISO, SCK, и CS для работы с вашим АЦП.
